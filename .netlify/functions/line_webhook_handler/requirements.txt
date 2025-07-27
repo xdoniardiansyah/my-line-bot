@@ -1,3 +1,0 @@
-line-bot-sdk
-azure-ai-inference
-azure-core

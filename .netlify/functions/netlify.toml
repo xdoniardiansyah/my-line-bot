@@ -1,0 +1,9 @@
+# netlify.toml
+
+[build]
+  command = "echo 'Starting Netlify build...'"
+  publish = "/"
+
+[functions]
+  directory = ".netlify/functions"
+  
