@@ -6,5 +6,3 @@
 
 [functions]
   directory = ".netlify/functions"
-  environment = { PYTHON_VERSION = "3.9" } # Anda bisa coba "3.10" atau "3.11" jika mau
-
