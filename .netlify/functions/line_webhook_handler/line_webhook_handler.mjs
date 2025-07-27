@@ -72,7 +72,7 @@ export const handler = async (event) => {
                     const response = await githubAiClient.path("/chat/completions").post({
                         body: {
                             messages: [
-                                { role:"system", content: "selalu balas dengan bahasa indonesia dan singkat dan padat dan tidak menggunakan kata-kata yang tidak perlu" },
+                                { role:"system", content: "selalu balas dengan bahasa gaul anak muda indonesia dan singkat dan padat dan tidak menggunakan kata-kata yang tidak perlu" },
                                 { role:"user", content: userMessage }
                             ],
                             temperature: 0.8, // Gunakan temperature dari contoh Anda
