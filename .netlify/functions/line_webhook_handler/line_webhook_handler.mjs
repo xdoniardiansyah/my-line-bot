@@ -144,7 +144,7 @@ export const handler = async (event) => {
                         const response = await githubAiClient.path("/chat/completions").post({
                             body: {
                                 messages: [
-                                    { role:"system", content: "selalu balas dengan bahasa gaul jakarta jaksel indonesia dan singkat dan padat dan tidak menggunakan kata-kata yang tidak perlu, jangan pakai bahasa gaul untuk perintah cuaca!" },
+                                    { role:"system", content: "balas obrolan dengan bahasa gaul jakarta selatan dan jangan membalas dengan kata kata yang tidak perlu, cukup balas dmdengan singkat padat dan jelas " },
                                     { role:"user", content: userMessage }
                                 ],
                                 temperature: 0.8, // Parameter disesuaikan untuk model AI
