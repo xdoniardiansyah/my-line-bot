@@ -1,4 +1,4 @@
-import line from '@line/bot-sdk';
+import * as line from '@line/bot-sdk';
 import axios from 'axios'; // Import axios
 
 const config = {
