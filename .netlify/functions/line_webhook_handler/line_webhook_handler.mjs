@@ -1,7 +1,7 @@
 import * as line from '@line/bot-sdk';
 import ModelClient, { isUnexpected } from "@azure-rest/ai-inference";
 import { AzureKeyCredential } from "@azure/core-auth";
-import axios from 'axios'; // Import axios untuk fitur cuaca
+import axios from 'axios'; // Import axios untuk fitur cuaca dan API lainnya
 
 // --- KONFIGURASI LINE BOT ---
 const config = {
@@ -42,6 +42,10 @@ if (githubToken) {
 const openWeatherMapApiKey = process.env.OPENWEATHER_API_KEY;
 const openWeatherMapBaseUrl = "https://api.openweathermap.org/data/2.5/weather";
 
+// --- KONFIGURASI SPOONACULAR API ---
+const spoonacularApiKey = process.env.SPOONACULAR_API_KEY; // Ambil API Key dari Environment Variables
+const spoonacularBaseUrl = "https://api.spoonacular.com";
+
 
 // --- FUNGSI UTAMA HANDLER ---
 export const handler = async (event) => {
@@ -64,9 +68,9 @@ export const handler = async (event) => {
     // Loop melalui setiap event dari LINE
     for (const eventItem of body.events) {
       if (eventItem.type === 'message' && eventItem.message.type === 'text') {
-        const userMessage = eventItem.message.text.toLowerCase(); // Ubah ke lowercase untuk perbandingan mudah
+        const userMessage = eventItem.message.text.toLowerCase();
         let replyText = "";
-        let aiUsed = "None"; // Untuk logging, AI/fitur mana yang berhasil digunakan
+        let aiUsed = "None";
 
         // --- Fitur Kustom: Cuaca ---
         if (userMessage.startsWith("cuaca ")) {
@@ -77,38 +81,60 @@ export const handler = async (event) => {
                         params: {
                             q: city,
                             appid: openWeatherMapApiKey,
-                            units: 'metric', // Untuk mendapatkan suhu dalam Celsius
-                            lang: 'id'     // Untuk mendapatkan deskripsi dalam Bahasa Indonesia
+                            units: 'metric',
+                            lang: 'id'
                         }
                     });
 
                     const data = weatherResponse.data;
                     const cityName = data.name;
                     const temp = data.main.temp;
-                    const description = data.weather[0].description;
+                    const rawDescription = data.weather[0].description;
                     const humidity = data.main.humidity;
                     const windSpeed = data.wind.speed;
 
-                    // Logika untuk menentukan emoji berdasarkan deskripsi cuaca
-                    let weatherEmoji = '☁️'; // Default
-                    if (description.includes('cerah') || description.includes('terang') || description.includes('panas')) {
-                        weatherEmoji = '☀️'; // Matahari
-                    } else if (description.includes('hujan')) {
-                        weatherEmoji = '🌧️'; // Hujan
-                    } else if (description.includes('berawan') || description.includes('awan') || description.includes('mendung')) {
-                        weatherEmoji = '☁️'; // Awan
-                    } else if (description.includes('badai') || description.includes('petir')) {
-                        weatherEmoji = '⛈️'; // Badai
-                    } else if (description.includes('kabut')) {
-                        weatherEmoji = '🌫️'; // Kabut
-                    } else if (description.includes('salju')) {
-                        weatherEmoji = '❄️'; // Salju
+                    // Logika untuk menentukan emoji dan memperbaiki deskripsi
+                    let weatherEmoji = '☁️'; // Default emoji
+                    let displayDescription = rawDescription; // Default display adalah deskripsi asli
+
+                    // Perbaikan untuk deskripsi umum
+                    if (rawDescription.includes('cerah') || rawDescription.includes('clear')) {
+                        weatherEmoji = '☀️';
+                        displayDescription = 'cerah';
+                    } else if (rawDescription.includes('hujan') || rawDescription.includes('rain')) {
+                        weatherEmoji = '🌧️';
+                        if (rawDescription.includes('ringan')) displayDescription = 'hujan ringan';
+                        else if (rawDescription.includes('sedang')) displayDescription = 'hujan sedang';
+                        else if (rawDescription.includes('lebat')) displayDescription = 'hujan lebat';
+                        else displayDescription = 'hujan';
+                    } else if (rawDescription.includes('berawan') || rawDescription.includes('clouds') || rawDescription.includes('mendung')) {
+                        weatherEmoji = '☁️';
+                        if (rawDescription.includes('pecah') || rawDescription.includes('broken')) {
+                            displayDescription = 'berawan (awan terpencar)';
+                        } else if (rawDescription.includes('tersebar') || rawDescription.includes('scattered')) {
+                            displayDescription = 'berawan tersebar';
+                        } else if (rawDescription.includes('sebagian') || rawDescription.includes('few')) {
+                            displayDescription = 'sebagian berawan';
+                        } else if (rawDescription.includes('padat') || rawDescription.includes('overcast')) {
+                            displayDescription = 'mendung tebal';
+                        } else {
+                            displayDescription = 'berawan';
+                        }
+                    } else if (rawDescription.includes('badai') || rawDescription.includes('storm')) {
+                        weatherEmoji = '⛈️';
+                        displayDescription = 'badai';
+                    } else if (rawDescription.includes('kabut') || rawDescription.includes('mist') || rawDescription.includes('fog')) {
+                        weatherEmoji = '🌫️';
+                        displayDescription = 'berkabut';
+                    } else if (rawDescription.includes('salju') || rawDescription.includes('snow')) {
+                        weatherEmoji = '❄️';
+                        displayDescription = 'bersalju';
                     } else {
-                        weatherEmoji = '🌡️'; // Suhu umum jika tidak ada yang cocok
+                        weatherEmoji = '🌡️';
+                        displayDescription = 'kondisi tidak diketahui';
                     }
 
-                    // Template jawaban cuaca yang Anda inginkan (sederhana + emoji)
-                    replyText = `Di ${cityName} ${weatherEmoji} ${description}. Suhu ${temp}°C.`;
+                    replyText = `Di ${cityName} ${weatherEmoji} ${displayDescription}. Suhu ${temp}°C.`;
 
                     aiUsed = "Custom: Weather";
                     console.log(`Weather info for ${city}: ${replyText}`);
@@ -131,7 +157,93 @@ export const handler = async (event) => {
                  aiUsed = "Custom: Weather (No City)";
             }
         }
-        // --- Fitur Kustom Lain yang tidak digunakan telah dihapus di sini ---
+        // --- Fitur Kustom: Spoonacular API ---
+        else if (userMessage.startsWith("resep acak")) {
+            if (spoonacularApiKey) {
+                try {
+                    const response = await axios.get(`${spoonacularBaseUrl}/recipes/random`, {
+                        params: {
+                            number: 1, // Hanya ingin 1 resep
+                            apiKey: spoonacularApiKey
+                        }
+                    });
+                    const recipe = response.data.recipes[0];
+                    if (recipe) {
+                        // Bersihkan HTML tags dari summary
+                        const summary = recipe.summary ? recipe.summary.replace(/<[^>]*>/g, '') : 'Tidak ada ringkasan.';
+                        const categories = recipe.dishTypes && recipe.dishTypes.length > 0
+                            ? recipe.dishTypes.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(', ') // Kapitalisasi huruf pertama
+                            : 'Tidak diketahui';
+
+                        replyText = `✨ Resep Acak untuk Kamu! ✨\n\n` +
+                                    `🍳 *${recipe.title}*\n` +
+                                    `    • Kategori: ${categories}\n` +
+                                    `    • Waktu Siap: ⏱️ ${recipe.readyInMinutes || '?'} menit\n\n` +
+                                    `📝 Ringkasan:\n` +
+                                    `${summary.substring(0, Math.min(summary.length, 250))}...\n\n` +
+                                    `➡️ Yuk, lihat resep lengkapnya di sini:\n` +
+                                    `${recipe.sourceUrl || 'Tidak ada link.'}`;
+
+                    } else {
+                        replyText = "Maaf, tidak dapat menemukan resep acak saat ini. 😕";
+                    }
+                    aiUsed = "Custom: Spoonacular Random Recipe";
+                } catch (e) {
+                    console.error("Error fetching Spoonacular random recipe:", e.response ? e.response.data : e.message);
+                    replyText = "Maaf, ada masalah saat mengambil resep acak. Coba lagi nanti atau cek API Key Spoonacular Anda. 🙏";
+                    aiUsed = "Custom: Spoonacular Random Recipe (Failed)";
+                }
+            } else {
+                replyText = "Maaf, fitur resep belum dikonfigurasi (API Key Spoonacular tidak ada). 🛠️";
+                aiUsed = "Custom: Spoonacular Random Recipe (No API Key)";
+            }
+        }
+        else if (userMessage.startsWith("cari resep ")) {
+            const query = userMessage.replace("cari resep ", "").trim();
+            if (query && spoonacularApiKey) {
+                try {
+                    const response = await axios.get(`${spoonacularBaseUrl}/recipes/complexSearch`, {
+                        params: {
+                            query: query,
+                            number: 1, // Ambil 1 resep teratas
+                            addRecipeInformation: true, // Untuk mendapatkan detail seperti summary, instructions
+                            apiKey: spoonacularApiKey
+                        }
+                    });
+                    const recipe = response.data.results[0];
+                    if (recipe) {
+                         const summary = recipe.summary ? recipe.summary.replace(/<[^>]*>/g, '') : 'Tidak ada ringkasan.';
+                        const categories = recipe.dishTypes && recipe.dishTypes.length > 0
+                            ? recipe.dishTypes.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(', ')
+                            : 'Tidak diketahui';
+
+                        replyText = `✨ Resep Ditemukan! ✨\n\n` +
+                                    `🥘 *${recipe.title}*\n` +
+                                    `    • Kategori: ${categories}\n` +
+                                    `    • Waktu Siap: ⏱️ ${recipe.readyInMinutes || '?'} menit\n\n` +
+                                    `📝 Ringkasan:\n` +
+                                    `${summary.substring(0, Math.min(summary.length, 250))}...\n\n` +
+                                    `➡️ Yuk, lihat resep lengkapnya di sini:\n` +
+                                    `${recipe.sourceUrl || 'Tidak ada link.'}`;
+
+                    } else {
+                        replyText = `Maaf, tidak menemukan resep untuk "${query}". 🧐`;
+                    }
+                    aiUsed = "Custom: Spoonacular Search Recipe";
+                } catch (e) {
+                    console.error("Error fetching Spoonacular search recipe:", e.response ? e.response.data : e.message);
+                    replyText = "Maaf, ada masalah saat mencari resep. Coba lagi nanti atau cek API Key Spoonacular Anda. 🙏";
+                    aiUsed = "Custom: Spoonacular Search Recipe (Failed)";
+                }
+            } else if (!spoonacularApiKey) {
+                replyText = "Maaf, fitur resep belum dikonfigurasi (API Key Spoonacular tidak ada). 🛠️";
+                aiUsed = "Custom: Spoonacular Search Recipe (No API Key)";
+            } else {
+                replyText = "Mohon sebutkan nama resep yang ingin dicari (contoh: cari resep nasi goreng). 🍽️";
+                aiUsed = "Custom: Spoonacular Search Recipe (No Query)";
+            }
+        }
+        // --- Akhir Fitur Kustom Spoonacular ---
 
 
         // --- Jika tidak ada fitur kustom yang cocok, baru panggil AI ---
@@ -144,7 +256,7 @@ export const handler = async (event) => {
                         const response = await githubAiClient.path("/chat/completions").post({
                             body: {
                                 messages: [
-                                    { role:"system", content: "balas obrolan dengan bahasa gaul jakarta selatan dan jangan membalas dengan kata kata yang tidak perlu, cukup balas dmdengan singkat padat dan jelas " },
+                                    { role:"system", content: "selalu balas dengan bahasa indonesia dan singkat dan padat dan tidak menggunakan kata-kata yang tidak perlu" },
                                     { role:"user", content: userMessage }
                                 ],
                                 temperature: 0.8, // Parameter disesuaikan untuk model AI
@@ -187,10 +299,15 @@ export const handler = async (event) => {
         }
 
         // Balas pesan ke LINE
-        await client.replyMessage(eventItem.replyToken, { type: 'text', text: replyText });
-        console.log(`Replied with AI: ${aiUsed}`);
+        if (replyText !== "") { // Pastikan ada sesuatu untuk dibalas
+            await client.replyMessage(eventItem.replyToken, { type: 'text', text: replyText });
+            console.log(`Replied with AI: ${aiUsed}`);
+        } else { // Fallback jika tidak ada fitur atau AI yang bisa membalas
+             await client.replyMessage(eventItem.replyToken, { type: 'text', text: "Maaf, saya tidak mengerti. Coba tanyakan hal lain." });
+             console.log("No feature or AI could handle the message.");
+        }
       }
-    }
+    } // Akhir for loop events
 
     return { statusCode: 200, body: 'OK' }; // Beri tahu LINE bahwa permintaan berhasil diproses
 
