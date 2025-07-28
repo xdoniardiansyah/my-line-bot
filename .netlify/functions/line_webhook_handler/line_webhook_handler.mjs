@@ -2,7 +2,7 @@ import * as line from '@line/bot-sdk';
 import ModelClient, { isUnexpected } from "@azure-rest/ai-inference";
 import { AzureKeyCredential } from "@azure/core-auth";
 import axios from 'axios';
-import SpotifyWebApi from 'spotify-web-api-node'; // <-- Tambahkan ini
+import SpotifyWebApi from 'spotify-web-api-node'; // <-- Sudah ada
 
 // --- KONFIGURASI LINE BOT ---
 const config = {
@@ -59,9 +59,7 @@ if (spotifyClientId && spotifyClientSecret) {
     });
 
     // Ambil token akses klien (client credentials flow)
-    // Token ini perlu diperbarui secara berkala, atau setiap kali fungsi di-invoke
     // Untuk fungsi serverless, paling aman mengambilnya di setiap invokasi atau menggunakan cache yang cerdas
-    // Untuk contoh ini, kita akan coba ambil di awal, namun jika error karena expired, akan dicoba lagi
     spotifyClient.clientCredentialsGrant()
         .then(data => {
             console.log('Spotify access token obtained. Expires in:', data.body['expires_in'], 'seconds.');
@@ -279,29 +277,21 @@ export const handler = async (event) => {
                     aiUsed = "Custom: Spotify Playlist Search (Not Ready)";
                 } else {
                     try {
-                        // Menggunakan spotifyClient.searchPlaylists() dari library spotify-web-api-node
                         const data = await spotifyClient.searchPlaylists(query, { limit: 3 });
                         const playlistResults = data.body.playlists.items; // Hasilnya ada di data.body.playlists.items
 
-                        let foundItems = [];
-
                         if (Array.isArray(playlistResults) && playlistResults.length > 0) {
-                            foundItems = playlistResults; // Ambil 3 hasil teratas
                             replyText = "🎧 Hasil Pencarian Playlist di Spotify: 🎧\n\n";
-                            foundItems.forEach((item, index) => {
+                            playlistResults.forEach((item, index) => { // Langsung iterasi playlistResults
                                 const title = item.name || "Judul playlist tidak diketahui";
-                                const owner = item.owner?.display_name || "Tidak diketahui";
-                                const externalUrl = item.external_urls?.spotify || "Link tidak tersedia";
+                                // Pengecekan eksplisit untuk owner dan display_name
+                                const owner = (item.owner && item.owner.display_name) ? item.owner.display_name : "Tidak diketahui";
+                                const externalUrl = (item.external_urls && item.external_urls.spotify) ? item.external_urls.spotify : "Link tidak tersedia";
 
                                 replyText += `${index + 1}. *${title}* oleh ${owner}\n`;
-                                // Deskripsi playlist jarang ada di hasil pencarian langsung, jadi bisa dihapus
-                                // atau disesuaikan jika API menyediakan
-                                // if (item.description) {
-                                //     replyText += `   Deskripsi: ${item.description.substring(0, Math.min(item.description.length, 70))}...\n`;
-                                // }
                                 replyText += `   Link: ${externalUrl}\n\n`;
                             });
-                            replyText = replyText.trim(); // Hapus spasi/newline terakhir
+                            replyText = replyText.trim();
                         } else {
                             replyText = `Maaf, tidak menemukan playlist di Spotify untuk "${query}". Coba kata kunci lain. 😔`;
                         }
@@ -344,9 +334,9 @@ export const handler = async (event) => {
                             replyText = `🎶 Hasil Pencarian ${resultType} di Spotify: 🎶\n\n`;
                             foundItems.forEach((item, index) => {
                                 const title = item.name || "Judul tidak diketahui";
-                                // Untuk lagu, ambil nama artis pertama
-                                const artist = (item.artists && item.artists.length > 0) ? item.artists[0].name : "Artis tidak diketahui";
-                                const externalUrl = item.external_urls?.spotify || "Link tidak tersedia";
+                                // Pengecekan eksplisit untuk artists dan name
+                                const artist = (item.artists && item.artists.length > 0 && item.artists[0].name) ? item.artists[0].name : "Artis tidak diketahui";
+                                const externalUrl = (item.external_urls && item.external_urls.spotify) ? item.external_urls.spotify : "Link tidak tersedia";
 
                                 replyText += `${index + 1}. *${title}*`;
                                 if (resultType === "Lagu") replyText += ` oleh ${artist}`;
@@ -375,7 +365,7 @@ export const handler = async (event) => {
         if (replyText === "") { // Hanya panggil AI jika belum ada balasan dari fitur kustom
             if (githubAiClient) {
                 let primaryAiSuccess = false;
-                for (const currentModel of githubAiModels) { // Loop melalui daftar daftar model
+                for (const currentModel of githubAiModels) { // Loop melalui daftar model
                     try {
                         console.log(`Trying GitHub AI with model: ${currentModel} for message: ${userMessage}`);
                         const response = await githubAiClient.path("/chat/completions").post({
