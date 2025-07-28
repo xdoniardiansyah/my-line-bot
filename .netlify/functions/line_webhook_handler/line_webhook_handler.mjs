@@ -200,7 +200,7 @@ export const handler = async (event) => {
                             : 'Tidak diketahui';
 
                         replyText = `✨ Resep Acak untuk Kamu! ✨\n\n` +
-                                    `🍳 *${recipe.title}*\n` +
+                                    `🍳 ${recipe.title}\n` + // Dihilangkan bintang
                                     `    • Kategori: ${categories}\n` +
                                     `    • Waktu Siap: ⏱️ ${recipe.readyInMinutes || '?'} menit\n\n` +
                                     `📝 Ringkasan:\n` +
@@ -242,7 +242,7 @@ export const handler = async (event) => {
                             : 'Tidak diketahui';
 
                         replyText = `✨ Resep Ditemukan! ✨\n\n` +
-                                    `🥘 *${recipe.title}*\n` +
+                                    `🥘 ${recipe.title}\n` + // Dihilangkan bintang
                                     `    • Kategori: ${categories}\n` +
                                     `    • Waktu Siap: ⏱️ ${recipe.readyInMinutes || '?'} menit\n\n` +
                                     `📝 Ringkasan:\n` +
@@ -281,17 +281,16 @@ export const handler = async (event) => {
                         const playlistResults = data.body.playlists.items; // Hasilnya ada di data.body.playlists.items
 
                         if (Array.isArray(playlistResults) && playlistResults.length > 0) {
-                            replyText = "🎧 Hasil Pencarian Playlist di Spotify: 🎧\n\n";
+                            replyText = `🎧 Temuan Playlist Santai di Spotify! 🧘‍♀️\n\n`; // Judul estetik
                             playlistResults.forEach((item, index) => { // Langsung iterasi playlistResults
                                 const title = item.name || "Judul playlist tidak diketahui";
-                                // Pengecekan eksplisit untuk owner dan display_name
                                 const owner = (item.owner && item.owner.display_name) ? item.owner.display_name : "Tidak diketahui";
                                 const externalUrl = (item.external_urls && item.external_urls.spotify) ? item.external_urls.spotify : "Link tidak tersedia";
 
-                                replyText += `${index + 1}. *${title}* oleh ${owner}\n`;
+                                replyText += `${index + 1}. ${title} oleh ${owner}\n`; // Dihilangkan bintang
                                 replyText += `   Link: ${externalUrl}\n\n`;
                             });
-                            replyText = replyText.trim();
+                            replyText = replyText.trim() + "\n\nSemoga hari Anda semakin tenang! 😌"; // Pesan penutup estetik
                         } else {
                             replyText = `Maaf, tidak menemukan playlist di Spotify untuk "${query}". Coba kata kunci lain. 😔`;
                         }
@@ -318,6 +317,7 @@ export const handler = async (event) => {
                     try {
                         let foundItems = [];
                         let resultType = "";
+                        let closingMessage = ""; // Pesan penutup
 
                         // Menggunakan spotifyClient.search() dengan array tipe untuk mencari lagu, album, dan artis
                         // Prioritas: Lagu, Album, Artis
@@ -326,36 +326,39 @@ export const handler = async (event) => {
                         if (data.body.tracks && data.body.tracks.items.length > 0) {
                             foundItems = data.body.tracks.items.slice(0, 3);
                             resultType = "Lagu";
-                        } else if (data.body.albums && data.body.albums.items.length > 0) { // Menambahkan penanganan album
+                            replyText = `🎵 Melodi yang Ditemukan di Spotify! 🎤\n\n`; // Judul estetik
+                            closingMessage = "Semoga menemukan irama favoritmu! 🎧";
+                        } else if (data.body.albums && data.body.albums.items.length > 0) {
                             foundItems = data.body.albums.items.slice(0, 3);
                             resultType = "Album";
+                            replyText = `💿 Koleksi Album Pilihan di Spotify! 🌠\n\n`; // Judul estetik
+                            closingMessage = "Nikmati setiap lagunya! ✨";
                         } else if (data.body.artists && data.body.artists.items.length > 0) {
                             foundItems = data.body.artists.items.slice(0, 3);
                             resultType = "Artis";
+                            replyText = `🌟 Mengenal Lebih Dekat Musisi di Spotify! 🎸\n\n`; // Judul estetik
+                            closingMessage = "Temukan lebih banyak karya mereka! 🎶";
                         }
 
                         if (foundItems.length > 0) {
-                            replyText = `🎶 Hasil Pencarian ${resultType} di Spotify: 🎶\n\n`;
                             foundItems.forEach((item, index) => {
                                 const title = item.name || "Judul tidak diketahui";
                                 const externalUrl = (item.external_urls && item.external_urls.spotify) ? item.external_urls.spotify : "Link tidak tersedia";
 
-                                replyText += `${index + 1}. *${title}*`;
+                                replyText += `${index + 1}. ${title}`; // Dihilangkan bintang
 
                                 if (resultType === "Lagu") {
-                                    // Pengecekan eksplisit untuk artists dan name
                                     const artist = (item.artists && item.artists.length > 0 && item.artists[0].name) ? item.artists[0].name : "Artis tidak diketahui";
                                     replyText += ` oleh ${artist}`;
-                                } else if (resultType === "Album") { // Menambahkan detail untuk album
+                                } else if (resultType === "Album") {
                                     const artist = (item.artists && item.artists.length > 0 && item.artists[0].name) ? item.artists[0].name : "Artis tidak diketahui";
                                     const releaseYear = item.release_date ? item.release_date.substring(0, 4) : "Tidak diketahui";
                                     replyText += ` oleh ${artist} (${releaseYear})`;
                                 }
-                                // Untuk Artis, tidak perlu tambahan "oleh" karena nama item sudah nama artis
 
                                 replyText += `\n   Link: ${externalUrl}\n\n`;
                             });
-                            replyText = replyText.trim();
+                            replyText = replyText.trim() + `\n\n${closingMessage}`; // Tambah pesan penutup
                         } else {
                             replyText = `Maaf, tidak menemukan hasil di Spotify untuk "${query}". Coba kata kunci lain. 😔`;
                         }
