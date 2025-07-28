@@ -2,7 +2,7 @@ import * as line from '@line/bot-sdk';
 import ModelClient, { isUnexpected } from "@azure-rest/ai-inference";
 import { AzureKeyCredential } from "@azure/core-auth";
 import axios from 'axios';
-import SpotifyWebApi from 'spotify-web-api-node'; // <-- Sudah ada
+import SpotifyWebApi from 'spotify-web-api-node';
 
 // --- KONFIGURASI LINE BOT ---
 const config = {
@@ -307,24 +307,28 @@ export const handler = async (event) => {
                 aiUsed = "Custom: Spotify Playlist Search (No Query)";
             }
         }
-        // --- Fitur Kustom: Spotify (CARI LAGU/ARTIS) ---
+        // --- Fitur Kustom: Spotify (CARI LAGU/ARTIS/ALBUM) ---
         else if (userMessage.startsWith("cari spotify ")) { // Ini adalah blok jika ingin cari lagu/artis/album
             const query = userMessage.replace("cari spotify ", "").trim();
             if (query) {
                 if (!spotifyClient || !spotifyClient.getAccessToken()) {
                     replyText = "Maaf, fitur Spotify belum siap. Coba lagi sebentar.";
-                    aiUsed = "Custom: Spotify Song/Artist Search (Not Ready)";
+                    aiUsed = "Custom: Spotify Search (Not Ready)";
                 } else {
                     try {
                         let foundItems = [];
                         let resultType = "";
 
-                        // Menggunakan spotifyClient.search() dengan array tipe untuk mencari lagu dan artis
-                        const data = await spotifyClient.search(query, ['track', 'artist'], { limit: 3 });
+                        // Menggunakan spotifyClient.search() dengan array tipe untuk mencari lagu, album, dan artis
+                        // Prioritas: Lagu, Album, Artis
+                        const data = await spotifyClient.search(query, ['track', 'album', 'artist'], { limit: 3 });
 
                         if (data.body.tracks && data.body.tracks.items.length > 0) {
                             foundItems = data.body.tracks.items.slice(0, 3);
                             resultType = "Lagu";
+                        } else if (data.body.albums && data.body.albums.items.length > 0) { // Menambahkan penanganan album
+                            foundItems = data.body.albums.items.slice(0, 3);
+                            resultType = "Album";
                         } else if (data.body.artists && data.body.artists.items.length > 0) {
                             foundItems = data.body.artists.items.slice(0, 3);
                             resultType = "Artis";
@@ -334,28 +338,37 @@ export const handler = async (event) => {
                             replyText = `🎶 Hasil Pencarian ${resultType} di Spotify: 🎶\n\n`;
                             foundItems.forEach((item, index) => {
                                 const title = item.name || "Judul tidak diketahui";
-                                // Pengecekan eksplisit untuk artists dan name
-                                const artist = (item.artists && item.artists.length > 0 && item.artists[0].name) ? item.artists[0].name : "Artis tidak diketahui";
                                 const externalUrl = (item.external_urls && item.external_urls.spotify) ? item.external_urls.spotify : "Link tidak tersedia";
 
                                 replyText += `${index + 1}. *${title}*`;
-                                if (resultType === "Lagu") replyText += ` oleh ${artist}`;
+
+                                if (resultType === "Lagu") {
+                                    // Pengecekan eksplisit untuk artists dan name
+                                    const artist = (item.artists && item.artists.length > 0 && item.artists[0].name) ? item.artists[0].name : "Artis tidak diketahui";
+                                    replyText += ` oleh ${artist}`;
+                                } else if (resultType === "Album") { // Menambahkan detail untuk album
+                                    const artist = (item.artists && item.artists.length > 0 && item.artists[0].name) ? item.artists[0].name : "Artis tidak diketahui";
+                                    const releaseYear = item.release_date ? item.release_date.substring(0, 4) : "Tidak diketahui";
+                                    replyText += ` oleh ${artist} (${releaseYear})`;
+                                }
+                                // Untuk Artis, tidak perlu tambahan "oleh" karena nama item sudah nama artis
+
                                 replyText += `\n   Link: ${externalUrl}\n\n`;
                             });
                             replyText = replyText.trim();
                         } else {
                             replyText = `Maaf, tidak menemukan hasil di Spotify untuk "${query}". Coba kata kunci lain. 😔`;
                         }
-                        aiUsed = "Custom: Spotify Song/Artist Search";
+                        aiUsed = "Custom: Spotify Search";
                     } catch (e) {
-                        console.error("Error fetching Spotify song/artist search results:", e.message);
+                        console.error("Error fetching Spotify search results:", e.message);
                         replyText = "Maaf, ada masalah saat mencari di Spotify. Coba lagi nanti. 🙏";
-                        aiUsed = "Custom: Spotify Song/Artist Search (Failed)";
+                        aiUsed = "Custom: Spotify Search (Failed)";
                     }
                 }
             } else {
-                replyText = "Mohon sebutkan lagu atau artis yang ingin dicari di Spotify (contoh: cari spotify Bad Romance). 🎵";
-                aiUsed = "Custom: Spotify Song/Artist Search (No Query)";
+                replyText = "Mohon sebutkan lagu, album, atau artis yang ingin dicari di Spotify (contoh: cari spotify Bad Romance). 🎵";
+                aiUsed = "Custom: Spotify Search (No Query)";
             }
         }
         // --- Akhir Fitur Kustom Spotify ---
