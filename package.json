@@ -3,6 +3,7 @@
     "@azure-rest/ai-inference": "^1.0.0-beta.6",
     "@azure/core-auth": "^1.10.0",
     "@line/bot-sdk": "^10.0.0",
-    "axios": "^1.11.0"
+    "axios": "^1.11.0",
+    "spotify-web-api-node": "^5.0.2"
   }
 }
