@@ -1,7 +1,9 @@
 import * as line from '@line/bot-sdk';
 import ModelClient, { isUnexpected } from "@azure-rest/ai-inference";
 import { AzureKeyCredential } from "@azure/core-auth";
-import axios from 'axios'; // Import axios untuk fitur cuaca dan API lainnya
+import axios from 'axios';
+// Library 'spotify' (tool) akan diinject secara otomatis oleh lingkungan Netlify/Gemini.
+// Anda tidak perlu 'import spotify' secara eksplisit di sini, cukup panggil spotify.search() atau spotify.play().
 
 // --- KONFIGURASI LINE BOT ---
 const config = {
@@ -46,6 +48,8 @@ const openWeatherMapBaseUrl = "https://api.openweathermap.org/data/2.5/weather";
 const spoonacularApiKey = process.env.SPOONACULAR_API_KEY; // Ambil API Key dari Environment Variables
 const spoonacularBaseUrl = "https://api.spoonacular.com";
 
+// --- KONFIGURASI SPOTIFY API (Tidak perlu diinisialisasi Client ID/Secret di sini jika pakai tool bawaan) ---
+// Tool 'spotify' akan otomatis mengelola otentikasi menggunakan env vars SPOTIFY_CLIENT_ID & SPOTIFY_CLIENT_SECRET.
 
 // --- FUNGSI UTAMA HANDLER ---
 export const handler = async (event) => {
@@ -93,11 +97,9 @@ export const handler = async (event) => {
                     const humidity = data.main.humidity;
                     const windSpeed = data.wind.speed;
 
-                    // Logika untuk menentukan emoji dan memperbaiki deskripsi
-                    let weatherEmoji = '☁️'; // Default emoji
-                    let displayDescription = rawDescription; // Default display adalah deskripsi asli
+                    let weatherEmoji = '☁️';
+                    let displayDescription = rawDescription;
 
-                    // Perbaikan untuk deskripsi umum
                     if (rawDescription.includes('cerah') || rawDescription.includes('clear')) {
                         weatherEmoji = '☀️';
                         displayDescription = 'cerah';
@@ -169,7 +171,6 @@ export const handler = async (event) => {
                     });
                     const recipe = response.data.recipes[0];
                     if (recipe) {
-                        // Bersihkan HTML tags dari summary
                         const summary = recipe.summary ? recipe.summary.replace(/<[^>]*>/g, '') : 'Tidak ada ringkasan.';
                         const categories = recipe.dishTypes && recipe.dishTypes.length > 0
                             ? recipe.dishTypes.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(', ') // Kapitalisasi huruf pertama
@@ -243,7 +244,110 @@ export const handler = async (event) => {
                 aiUsed = "Custom: Spoonacular Search Recipe (No Query)";
             }
         }
-        // --- Akhir Fitur Kustom Spoonacular ---
+        // --- Fitur Kustom: Spotify (CARI PLAYLIST SAJA) ---
+        else if (userMessage.startsWith("cari playlist ")) { // Perintah baru untuk playlist saja
+            const query = userMessage.replace("cari playlist ", "").trim();
+            if (query) {
+                try {
+                    const playlistResults = await spotify.search(query, spotify.IntentType.PUBLIC_PLAYLIST);
+                    let foundItems = [];
+
+                    if (Array.isArray(playlistResults) && playlistResults.length > 0) {
+                        foundItems = playlistResults.slice(0, 3); // Ambil 3 hasil teratas
+                        replyText = "🎧 Hasil Pencarian Playlist di Spotify: 🎧\n\n";
+                        foundItems.forEach((item, index) => {
+                            const title = item.media_item_metadata?.entity_title || "Judul playlist tidak diketahui";
+                            const description = item.media_item_metadata?.description || "Tidak ada deskripsi.";
+                            const owner = item.media_item_metadata?.owner_name || "Tidak diketahui";
+                            const uri = item.uri;
+
+                            let spotifyLink = 'Link tidak tersedia';
+                            if (uri && uri.startsWith('spotify:playlist:')) {
+                                const id = uri.split(':').pop();
+                                spotifyLink = `https://open.spotify.com/playlist/${id}`;
+                            }
+
+                            replyText += `${index + 1}. *${title}* oleh ${owner}\n`;
+                            if (description !== "Tidak ada deskripsi.") {
+                                replyText += `   Deskripsi: ${description.substring(0, Math.min(description.length, 70))}...\n`;
+                            }
+                            replyText += `   Link: ${spotifyLink}\n\n`;
+                        });
+                        replyText = replyText.trim(); // Hapus spasi/newline terakhir
+                    } else {
+                        replyText = `Maaf, tidak menemukan playlist di Spotify untuk "${query}". Coba kata kunci lain. 😔`;
+                    }
+                    aiUsed = "Custom: Spotify Playlist Search";
+                } catch (e) {
+                    console.error("Error fetching Spotify playlist search results:", e.message);
+                    replyText = "Maaf, ada masalah saat mencari playlist di Spotify. Coba lagi nanti. 🙏";
+                    aiUsed = "Custom: Spotify Playlist Search (Failed)";
+                }
+            } else {
+                replyText = "Mohon sebutkan nama playlist yang ingin dicari (contoh: cari playlist santai). 🎶";
+                aiUsed = "Custom: Spotify Playlist Search (No Query)";
+            }
+        }
+        // --- Fitur Kustom: Spotify (CARI LAGU/ARTIS) ---
+        else if (userMessage.startsWith("cari spotify ")) { // Ini adalah blok jika ingin cari lagu/artis/album
+            const query = userMessage.replace("cari spotify ", "").trim();
+            if (query) {
+                try {
+                    let foundItems = [];
+                    let resultType = "";
+
+                    // Prioritaskan Lagu
+                    const songResults = await spotify.search(query, spotify.IntentType.SONG);
+                    if (Array.isArray(songResults) && songResults.length > 0) {
+                        foundItems = songResults.slice(0, 3);
+                        resultType = "Lagu";
+                    }
+
+                    // Lalu Artis
+                    if (foundItems.length === 0) {
+                        const artistResults = await spotify.search(query, spotify.IntentType.ARTIST);
+                        if (Array.isArray(artistResults) && artistResults.length > 0) {
+                            foundItems = artistResults.slice(0, 3);
+                            resultType = "Artis";
+                        }
+                    }
+
+                    if (foundItems.length > 0) {
+                        replyText = `🎶 Hasil Pencarian ${resultType} di Spotify: 🎶\n\n`;
+                        foundItems.forEach((item, index) => {
+                            const title = item.media_item_metadata?.entity_title || "Judul tidak diketahui";
+                            const artist = item.media_item_metadata?.artist_name || "Artis tidak diketahui";
+                            const uri = item.uri;
+
+                            let spotifyLink = 'Link tidak tersedia';
+                            if (uri && uri.startsWith('spotify:track:')) {
+                                const id = uri.split(':').pop();
+                                spotifyLink = `https://open.spotify.com/track/${id}`;
+                            } else if (uri && uri.startsWith('spotify:artist:')) {
+                                const id = uri.split(':').pop();
+                                spotifyLink = `https://open.spotify.com/artist/${id}`;
+                            }
+
+                            replyText += `${index + 1}. *${title}*`;
+                            if (resultType === "Lagu") replyText += ` oleh ${artist}`;
+                            replyText += `\n   Link: ${spotifyLink}\n\n`;
+                        });
+                        replyText = replyText.trim();
+                    } else {
+                        replyText = `Maaf, tidak menemukan hasil di Spotify untuk "${query}". Coba kata kunci lain. 😔`;
+                    }
+                    aiUsed = "Custom: Spotify Song/Artist Search";
+                } catch (e) {
+                    console.error("Error fetching Spotify song/artist search results:", e.message);
+                    replyText = "Maaf, ada masalah saat mencari di Spotify. Coba lagi nanti. 🙏";
+                    aiUsed = "Custom: Spotify Song/Artist Search (Failed)";
+                }
+            } else {
+                replyText = "Mohon sebutkan lagu atau artis yang ingin dicari di Spotify (contoh: cari spotify Bad Romance). 🎵";
+                aiUsed = "Custom: Spotify Song/Artist Search (No Query)";
+            }
+        }
+        // --- Akhir Fitur Kustom Spotify ---
 
 
         // --- Jika tidak ada fitur kustom yang cocok, baru panggil AI ---
