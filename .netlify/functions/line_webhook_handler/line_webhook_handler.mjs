@@ -73,6 +73,10 @@ if (spotifyClientId && spotifyClientSecret) {
     console.warn("SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET not found. Spotify features will be limited.");
 }
 
+// --- KONFIGURASI KLIK RESI API ---
+const klikResiApiKey = process.env.KLIK_RESI_API_KEY;
+const klikResiBaseUrl = "https://klikresi.com/api"; // Endpoint dasar Klik Resi
+
 
 // --- FUNGSI UTAMA HANDLER ---
 export const handler = async (event) => {
@@ -376,6 +380,90 @@ export const handler = async (event) => {
         }
         // --- Akhir Fitur Kustom Spotify ---
 
+        // --- Fitur Kustom: Cek Resi (Klik Resi) ---
+        // Deteksi pola: "cek resi [kode_kurir] [nomor_resi]"
+        // Contoh: "cek resi jne 1234567890" atau "cek resi pos EX123456789ID"
+        const cekResiMatch = userMessage.match(/^cek resi\s+(\S+)\s+([a-zA-Z0-9]+)$/);
+
+        if (cekResiMatch) {
+            const courierCode = cekResiMatch[1]; // Kode kurir dari pesan user (misal: "jne")
+            const trackingNumber = cekResiMatch[2]; // Nomor resi dari pesan user
+
+            if (klikResiApiKey) {
+                try {
+                    console.log(`Mencoba cek resi: Kurir=${courierCode}, Resi=${trackingNumber}`);
+                    const response = await axios.get(
+                        `${klikResiBaseUrl}/trackings/${trackingNumber}/couriers/${courierCode}`,
+                        {
+                            headers: {
+                                'x-api-key': klikResiApiKey
+                            }
+                        }
+                    );
+
+                    const data = response.data;
+
+                    if (data.success && data.data && data.data.summary) {
+                        const summary = data.data.summary;
+                        const history = data.data.history || [];
+
+                        // Format tampilan untuk LINE
+                        let historyDetails = "";
+                        if (history.length > 0) {
+                            historyDetails = "Riwayat Pengiriman:\n";
+                            // Ambil 5 riwayat terbaru untuk menghindari pesan terlalu panjang
+                            // Urutkan dari yang terbaru ke terlama jika API tidak mengembalikan secara berurutan
+                            history.sort((a, b) => new Date(b.date) - new Date(a.date));
+                            history.slice(0, 5).forEach(item => {
+                                historyDetails += `• [${new Date(item.date).toLocaleString('id-ID')}] ${item.description}\n`;
+                            });
+                            if (history.length > 5) {
+                                historyDetails += `... (lihat selengkapnya di website Klik Resi)\n`;
+                            }
+                        } else {
+                            historyDetails = "Riwayat pengiriman tidak tersedia.";
+                        }
+
+
+                        replyText = `📦 Status Resi: **${summary.tracking_number}**\n` +
+                                    `Kurir: **${summary.courier_name}**\n` +
+                                    `Status Terakhir: **${summary.status}**\n` +
+                                    `Lokasi: **${summary.last_update_location || 'Tidak diketahui'}**\n` +
+                                    `Tanggal Update: **${new Date(summary.last_update_date).toLocaleString('id-ID')}**\n\n` +
+                                    `${historyDetails}`;
+
+                    } else if (data.message) {
+                        // Jika ada pesan error dari API Klik Resi
+                        replyText = `Maaf, terjadi kesalahan saat cek resi: ${data.message}.`;
+                    } else {
+                        // Jika format respons tidak seperti yang diharapkan
+                        replyText = "Maaf, data resi tidak ditemukan atau formatnya tidak sesuai.";
+                    }
+                    aiUsed = "Custom: Cek Resi";
+                    console.log(`Cek Resi info for ${trackingNumber}: ${replyText}`);
+
+                } catch (cekResiError) {
+                    console.error(`Error fetching Klik Resi for ${trackingNumber}:`, cekResiError.response ? cekResiError.response.data : cekResiError.message);
+                    if (cekResiError.response && cekResiError.response.status === 401) {
+                        replyText = "Maaf, API Key Klik Resi tidak valid atau tidak terotorisasi.";
+                    } else if (cekResiError.response && cekResiError.response.status === 404) {
+                        replyText = "Maaf, nomor resi atau kode kurir tidak ditemukan/invalid. Pastikan format 'cek resi [kode_kurir] [nomor_resi]' sudah benar.";
+                    } else {
+                        replyText = "Maaf, ada masalah saat mengambil data resi. Coba lagi nanti.";
+                    }
+                    aiUsed = "Custom: Cek Resi (Failed)";
+                }
+            } else {
+                replyText = "Maaf, fitur cek resi belum dikonfigurasi sepenuhnya (API Key Klik Resi tidak ada).";
+                aiUsed = "Custom: Cek Resi (No API Key)";
+            }
+        } else if (userMessage.startsWith("cek resi")) {
+            // Jika user hanya mengetik "cek resi" tanpa parameter lengkap
+            replyText = "Mohon masukkan format yang benar: `cek resi [kode_kurir] [nomor_resi]` (contoh: `cek resi jne 1234567890`).";
+            aiUsed = "Custom: Cek Resi (Invalid Format)";
+        }
+        // --- Akhir Fitur Kustom: Cek Resi ---
+
 
         // --- Jika tidak ada fitur kustom yang cocok, baru panggil AI ---
         if (replyText === "") { // Hanya panggil AI jika belum ada balasan dari fitur kustom
@@ -448,4 +536,5 @@ export const handler = async (event) => {
     return { statusCode: 500, body: `Internal Server Error: ${err.message}` };
   }
 };
+
 
