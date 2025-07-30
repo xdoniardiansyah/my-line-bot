@@ -204,7 +204,7 @@ export const handler = async (event) => {
                             : 'Tidak diketahui';
 
                         replyText = `✨ Resep Acak untuk Kamu! ✨\n\n` +
-                                    `🍳 ${recipe.title}\n` + // Dihilangkan bintang
+                                    `🍳 ${recipe.title}\n` +
                                     `    • Kategori: ${categories}\n` +
                                     `    • Waktu Siap: ⏱️ ${recipe.readyInMinutes || '?'} menit\n\n` +
                                     `📝 Ringkasan:\n` +
@@ -246,7 +246,7 @@ export const handler = async (event) => {
                             : 'Tidak diketahui';
 
                         replyText = `✨ Resep Ditemukan! ✨\n\n` +
-                                    `🥘 ${recipe.title}\n` + // Dihilangkan bintang
+                                    `🥘 ${recipe.title}\n` +
                                     `    • Kategori: ${categories}\n` +
                                     `    • Waktu Siap: ⏱️ ${recipe.readyInMinutes || '?'} menit\n\n` +
                                     `📝 Ringkasan:\n` +
@@ -272,29 +272,28 @@ export const handler = async (event) => {
             }
         }
         // --- Fitur Kustom: Spotify (CARI PLAYLIST SAJA) ---
-        else if (userMessage.startsWith("cari playlist ")) { // Perintah baru untuk playlist saja
+        else if (userMessage.startsWith("cari playlist ")) {
             const query = userMessage.replace("cari playlist ", "").trim();
             if (query) {
-                // Pastikan spotifyClient sudah terinisialisasi dan memiliki token
                 if (!spotifyClient || !spotifyClient.getAccessToken()) {
                     replyText = "Maaf, fitur Spotify belum siap. Coba lagi sebentar.";
                     aiUsed = "Custom: Spotify Playlist Search (Not Ready)";
                 } else {
                     try {
                         const data = await spotifyClient.searchPlaylists(query, { limit: 3 });
-                        const playlistResults = data.body.playlists.items; // Hasilnya ada di data.body.playlists.items
+                        const playlistResults = data.body.playlists.items;
 
                         if (Array.isArray(playlistResults) && playlistResults.length > 0) {
-                            replyText = `🎧 Temuan Playlist Santai di Spotify! 🧘‍♀️\n\n`; // Judul estetik
-                            playlistResults.forEach((item, index) => { // Langsung iterasi playlistResults
+                            replyText = `🎧 Temuan Playlist Santai di Spotify! 🧘‍♀️\n\n`;
+                            playlistResults.forEach((item, index) => {
                                 const title = item.name || "Judul playlist tidak diketahui";
                                 const owner = (item.owner && item.owner.display_name) ? item.owner.display_name : "Tidak diketahui";
                                 const externalUrl = (item.external_urls && item.external_urls.spotify) ? item.external_urls.spotify : "Link tidak tersedia";
 
-                                replyText += `${index + 1}. ${title} oleh ${owner}\n`; // Dihilangkan bintang
+                                replyText += `${index + 1}. ${title} oleh ${owner}\n`;
                                 replyText += `   Link: ${externalUrl}\n\n`;
                             });
-                            replyText = replyText.trim() + "\n\nSemoga hari Anda semakin tenang! 😌"; // Pesan penutup estetik
+                            replyText = replyText.trim() + "\n\nSemoga hari Anda semakin tenang! 😌";
                         } else {
                             replyText = `Maaf, tidak menemukan playlist di Spotify untuk "${query}". Coba kata kunci lain. 😔`;
                         }
@@ -311,7 +310,7 @@ export const handler = async (event) => {
             }
         }
         // --- Fitur Kustom: Spotify (CARI LAGU/ARTIS/ALBUM) ---
-        else if (userMessage.startsWith("cari spotify ")) { // Ini adalah blok jika ingin cari lagu/artis/album
+        else if (userMessage.startsWith("cari spotify ")) {
             const query = userMessage.replace("cari spotify ", "").trim();
             if (query) {
                 if (!spotifyClient || !spotifyClient.getAccessToken()) {
@@ -321,26 +320,24 @@ export const handler = async (event) => {
                     try {
                         let foundItems = [];
                         let resultType = "";
-                        let closingMessage = ""; // Pesan penutup
+                        let closingMessage = "";
 
-                        // Menggunakan spotifyClient.search() dengan array tipe untuk mencari lagu, album, dan artis
-                        // Prioritas: Lagu, Album, Artis
                         const data = await spotifyClient.search(query, ['track', 'album', 'artist'], { limit: 3 });
 
                         if (data.body.tracks && data.body.tracks.items.length > 0) {
                             foundItems = data.body.tracks.items.slice(0, 3);
                             resultType = "Lagu";
-                            replyText = `🎵 Melodi yang Ditemukan di Spotify! 🎤\n\n`; // Judul estetik
+                            replyText = `🎵 Melodi yang Ditemukan di Spotify! 🎤\n\n`;
                             closingMessage = "Semoga menemukan irama favoritmu! 🎧";
                         } else if (data.body.albums && data.body.albums.items.length > 0) {
                             foundItems = data.body.albums.items.slice(0, 3);
                             resultType = "Album";
-                            replyText = `💿 Koleksi Album Pilihan di Spotify! 🌠\n\n`; // Judul estetik
+                            replyText = `💿 Koleksi Album Pilihan di Spotify! 🌠\n\n`;
                             closingMessage = "Nikmati setiap lagunya! ✨";
                         } else if (data.body.artists && data.body.artists.items.length > 0) {
                             foundItems = data.body.artists.items.slice(0, 3);
                             resultType = "Artis";
-                            replyText = `🌟 Mengenal Lebih Dekat Musisi di Spotify! 🎸\n\n`; // Judul estetik
+                            replyText = `🌟 Mengenal Lebih Dekat Musisi di Spotify! 🎸\n\n`;
                             closingMessage = "Temukan lebih banyak karya mereka! 🎶";
                         }
 
@@ -349,7 +346,7 @@ export const handler = async (event) => {
                                 const title = item.name || "Judul tidak diketahui";
                                 const externalUrl = (item.external_urls && item.external_urls.spotify) ? item.external_urls.spotify : "Link tidak tersedia";
 
-                                replyText += `${index + 1}. ${title}`; // Dihilangkan bintang
+                                replyText += `${index + 1}. ${title}`;
 
                                 if (resultType === "Lagu") {
                                     const artist = (item.artists && item.artists.length > 0 && item.artists[0].name) ? item.artists[0].name : "Artis tidak diketahui";
@@ -362,7 +359,7 @@ export const handler = async (event) => {
 
                                 replyText += `\n   Link: ${externalUrl}\n\n`;
                             });
-                            replyText = replyText.trim() + `\n\n${closingMessage}`; // Tambah pesan penutup
+                            replyText = replyText.trim() + `\n\n${closingMessage}`;
                         } else {
                             replyText = `Maaf, tidak menemukan hasil di Spotify untuk "${query}". Coba kata kunci lain. 😔`;
                         }
@@ -380,14 +377,12 @@ export const handler = async (event) => {
         }
         // --- Akhir Fitur Kustom Spotify ---
 
-        // --- Fitur Kustom: Cek Resi (Klik Resi) ---
-        // Deteksi pola: "cek resi [kode_kurir] [nomor_resi]"
-        // Contoh: "cek resi jne 1234567890" atau "cek resi pos EX123456789ID"
-        const cekResiMatch = userMessage.match(/^cek resi\s+(\S+)\s+([a-zA-Z0-9]+)$/);
+        // --- Fitur Kustom: Cek Resi (Klik Resi) --- [KODE DIPERBAIKI] ---
+        const cekResiMatch = userMessage.match(/^cek resi\s+(\S+)\s+(\S+)$/);
 
         if (cekResiMatch) {
-            const courierCode = cekResiMatch[1]; // Kode kurir dari pesan user (misal: "jne")
-            const trackingNumber = cekResiMatch[2]; // Nomor resi dari pesan user
+            const courierCode = cekResiMatch[1];
+            const trackingNumber = cekResiMatch[2];
 
             if (klikResiApiKey) {
                 try {
@@ -401,55 +396,56 @@ export const handler = async (event) => {
                         }
                     );
 
-                    const data = response.data;
+                    const apiData = response.data.data; // Langsung akses object 'data' dari respons
 
-                    if (data.success && data.data && data.data.summary) {
-                        const summary = data.data.summary;
-                        const history = data.data.history || [];
+                    // Ganti kondisi pengecekan agar sesuai dokumentasi
+                    if (apiData && apiData.histories) {
+                        const histories = apiData.histories || [];
+                        const lastStatus = histories.length > 0 ? histories[0] : null; // Ambil status terakhir dari riwayat pertama
 
-                        // Format tampilan untuk LINE
                         let historyDetails = "";
-                        if (history.length > 0) {
+                        if (histories.length > 0) {
                             historyDetails = "Riwayat Pengiriman:\n";
-                            // Ambil 5 riwayat terbaru untuk menghindari pesan terlalu panjang
-                            // Urutkan dari yang terbaru ke terlama jika API tidak mengembalikan secara berurutan
-                            history.sort((a, b) => new Date(b.date) - new Date(a.date));
-                            history.slice(0, 5).forEach(item => {
-                                historyDetails += `• [${new Date(item.date).toLocaleString('id-ID')}] ${item.description}\n`;
+                            // Dokumentasi sudah mengurutkan dari terbaru, jadi tidak perlu .sort() lagi
+                            histories.slice(0, 5).forEach(item => {
+                                // GANTI 'item.description' menjadi 'item.message'
+                                historyDetails += `• [${new Date(item.date).toLocaleString('id-ID')}] ${item.message}\n`;
                             });
-                            if (history.length > 5) {
-                                historyDetails += `... (lihat selengkapnya di website Klik Resi)\n`;
+                            if (histories.length > 5) {
+                                historyDetails += `... (dan riwayat lainnya)\n`;
                             }
                         } else {
                             historyDetails = "Riwayat pengiriman tidak tersedia.";
                         }
 
-
-                        replyText = `📦 Status Resi: **${summary.tracking_number}**\n` +
-                                    `Kurir: **${summary.courier_name}**\n` +
-                                    `Status Terakhir: **${summary.status}**\n` +
-                                    `Lokasi: **${summary.last_update_location || 'Tidak diketahui'}**\n` +
-                                    `Tanggal Update: **${new Date(summary.last_update_date).toLocaleString('id-ID')}**\n\n` +
+                        // Buat ulang format balasan karena object 'summary' tidak ada
+                        replyText = `📦 Status Resi: **${trackingNumber}**\n` +
+                                    `Kurir: **${courierCode.toUpperCase()}**\n` +
+                                    // Ambil status dari data utama atau dari riwayat terakhir
+                                    `Status Terakhir: **${apiData.status || (lastStatus ? lastStatus.status : 'Tidak diketahui')}**\n` +
+                                    `Tanggal Update: **${lastStatus ? new Date(lastStatus.date).toLocaleString('id-ID') : 'Tidak diketahui'}**\n\n` +
                                     `${historyDetails}`;
 
-                    } else if (data.message) {
-                        // Jika ada pesan error dari API Klik Resi
-                        replyText = `Maaf, terjadi kesalahan saat cek resi: ${data.message}.`;
                     } else {
                         // Jika format respons tidak seperti yang diharapkan
-                        replyText = "Maaf, data resi tidak ditemukan atau formatnya tidak sesuai.";
+                        replyText = "Maaf, data resi tidak ditemukan atau format respons dari API tidak sesuai.";
                     }
                     aiUsed = "Custom: Cek Resi";
                     console.log(`Cek Resi info for ${trackingNumber}: ${replyText}`);
 
                 } catch (cekResiError) {
+                    // Blok catch Anda sudah bagus, bisa dibiarkan seperti adanya
                     console.error(`Error fetching Klik Resi for ${trackingNumber}:`, cekResiError.response ? cekResiError.response.data : cekResiError.message);
+                    const apiErrorMessage = cekResiError.response?.data?.message;
+
                     if (cekResiError.response && cekResiError.response.status === 401) {
                         replyText = "Maaf, API Key Klik Resi tidak valid atau tidak terotorisasi.";
+                    } else if (apiErrorMessage) {
+                        replyText = `Maaf, terjadi kesalahan: ${apiErrorMessage}`;
                     } else if (cekResiError.response && cekResiError.response.status === 404) {
-                        replyText = "Maaf, nomor resi atau kode kurir tidak ditemukan/invalid. Pastikan format 'cek resi [kode_kurir] [nomor_resi]' sudah benar.";
+                        replyText = "Maaf, nomor resi atau kode kurir tidak ditemukan/invalid.";
                     } else {
-                        replyText = "Maaf, ada masalah saat mengambil data resi. Coba lagi nanti.";
+                        replyText = "Maaf, ada masalah teknis saat mengambil data resi.";
                     }
                     aiUsed = "Custom: Cek Resi (Failed)";
                 }
@@ -478,39 +474,35 @@ export const handler = async (event) => {
                                     { role:"system", content: "selalu balas dengan bahasa indonesia dan singkat dan padat dan tidak menggunakan kata-kata yang tidak perlu" },
                                     { role:"user", content: userMessage }
                                 ],
-                                temperature: 0.8, // Parameter disesuaikan untuk model AI
-                                top_p: 0.1,     // Parameter disesuaikan untuk model AI
-                                max_tokens: 2048, // Parameter disesuaikan untuk model AI
-                                model: currentModel // Gunakan model dari loop
+                                temperature: 0.8,
+                                top_p: 0.1,
+                                max_tokens: 2048,
+                                model: currentModel
                             }
                         });
 
                         if (isUnexpected(response)) {
-                            // Jika ada error dari model ini, coba model berikutnya
                             console.warn(`GitHub AI with model ${currentModel} failed (status: ${response.status || 'unknown'}). Error: ${response.body.error ? JSON.stringify(response.body.error) : 'No error detail'}`);
-                            continue; // Lanjutkan ke iterasi berikutnya (model selanjutnya)
+                            continue;
                         }
 
                         replyText = response.body.choices[0].message.content;
                         aiUsed = `GitHub AI (${currentModel})`;
                         console.log(`GitHub AI response (Model: ${currentModel}): ${replyText}`);
-                        primaryAiSuccess = true; // Set flag sukses
-                        break; // Keluar dari loop karena sudah berhasil
+                        primaryAiSuccess = true;
+                        break;
                     } catch (e) {
-                        // Jika ada error lain (misal network), log dan coba model berikutnya
                         console.warn(`GitHub AI with model ${currentModel} call failed: ${e.message || e}.`);
-                        continue; // Lanjutkan ke iterasi berikutnya (model selanjutnya)
+                        continue;
                     }
                 }
 
-                // Jika semua model GitHub AI gagal
                 if (!primaryAiSuccess) {
                     replyText = "Maaf, semua model AI GitHub gagal merespons. Silakan coba lagi nanti.";
                     aiUsed = "None (GitHub AI models failed)";
                     console.error("All specified GitHub AI models failed to provide a response.");
                 }
             } else {
-                // Jika GitHub AI tidak terinisialisasi sama sekali (misal GITHUB_TOKEN tidak ada)
                 replyText = "Bot ini belum terhubung dengan AI. Silakan hubungi admin.";
                 aiUsed = "None (GitHub AI client not initialized)";
                 console.error("GitHub AI client not initialized.");
@@ -518,23 +510,21 @@ export const handler = async (event) => {
         }
 
         // Balas pesan ke LINE
-        if (replyText !== "") { // Pastikan ada sesuatu untuk dibalas
+        if (replyText !== "") {
             await client.replyMessage(eventItem.replyToken, { type: 'text', text: replyText });
             console.log(`Replied with AI: ${aiUsed}`);
-        } else { // Fallback jika tidak ada fitur atau AI yang bisa membalas
+        } else {
              await client.replyMessage(eventItem.replyToken, { type: 'text', text: "Maaf, saya tidak mengerti. Coba tanyakan hal lain." });
              console.log("No feature or AI could handle the message.");
         }
       }
-    } // Akhir for loop events
+    }
 
-    return { statusCode: 200, body: 'OK' }; // Beri tahu LINE bahwa permintaan berhasil diproses
+    return { statusCode: 200, body: 'OK' };
 
   } catch (err) {
-    // Tangani error yang tidak terduga pada tingkat handler
     console.error("Error handling webhook event:", err);
     return { statusCode: 500, body: `Internal Server Error: ${err.message}` };
   }
 };
-
 
